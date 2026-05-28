@@ -1,115 +1,106 @@
-private ["_damage","_percentage","_veh","_vehType","_fuelLevel"];
-_veh = _this select 0;
-_vehType = getText(configFile>>"CfgVehicles">>typeOf _veh>>"DisplayName");
+/*
+    Vehicle service pad script for Air-Battle.Altis.
 
-if (_veh isKindOf "ParachuteBase" || !alive _veh) exitWith {};
-//if !((_veh isKindOf "Helicopter" ) or (_veh isKindOf "plane")) exitWith { _veh vehicleChat "This pad is for chopper repairs only, soldier!"; };
+    Expected usage from trigger activation:
+        _handle = [thisList] execVM "misc\rearm.sqf";
 
-_fuelLevel = fuel _veh;
-_damage = getDammage _veh;
-_veh setFuel 0;
-_ghosthawkAmmo = 0;
-_ghosthawkFlares = 0;
+    The script intentionally runs on the server only so multiplayer trigger
+    activation does not start duplicate service jobs on every connected client.
+*/
+if (!isServer) exitWith {};
 
-_veh setVehicleAmmo 1;
-_veh vehicleChat format ["Servicing %1... Please stand by...", _vehType];
-_magazines = getArray(configFile >> "CfgVehicles" >> _vehType >> "magazines");
+params [
+    ["_targets", [], [[], objNull]]
+];
 
-if (count _magazines > 0) then {
-	_removed = [];
-	{
-		if (!(_x in _removed)) then {
-			_veh removeMagazines _x;
-			_removed = _removed + [_x];
-		};
-	} forEach _magazines;
-	{
-		_veh vehicleChat format ["Reloading %1", _x];
-		sleep 0.05;
-		_veh addMagazine _x;
-	} forEach _magazines;
+private _targetList = if (_targets isEqualType []) then { _targets } else { [_targets] };
+private _vehicles = (_targetList apply { vehicle _x }) select {
+    !isNull _x &&
+    { alive _x } &&
+    { !(_x isKindOf "Man") } &&
+    { !(_x isKindOf "ParachuteBase") }
 };
 
-_count = count (configFile >> "CfgVehicles" >> _vehType >> "Turrets");
+if (_vehicles isEqualTo []) exitWith {};
 
-if (_count > 0) then {
-	for "_i" from 0 to (_count - 1) do {
-		scopeName "xx_reload2_xx";
-		_config = (configFile >> "CfgVehicles" >> _vehType >> "Turrets") select _i;
-		_magazines = getArray(_config >> "magazines");
-		_removed = [];
-		{
-			if (!(_x in _removed)) then {
-				_veh removeMagazines _x;
-				_removed = _removed + [_x];
-			};
-		} forEach _magazines;
-		{
-			_veh vehicleChat format ["Reloading %1", _x];
-			sleep 0.05;
-			_veh addMagazine _x;
-			sleep 0.05;
-		} forEach _magazines;
-		_count_other = count (_config >> "Turrets");
-		if (_count_other > 0) then {
-			for "_i" from 0 to (_count_other - 1) do {
-				_config2 = (_config >> "Turrets") select _i;
-				_magazines = getArray(_config2 >> "magazines");
-				_removed = [];
-				{
-					if (!(_x in _removed)) then {
-						_veh removeMagazines _x;
-						_removed = _removed + [_x];
-					};
-				} forEach _magazines;
-				{
-					_veh vehicleChat format ["Reloading %1", _x]; 
-					sleep 0.05;
-					_veh addMagazine _x;
-					sleep 0.05;
-				} forEach _magazines;
-			};
-		};
-	};
-};
-_veh setVehicleAmmo 1;	// Reload turrets / drivers magazine
-
-
-_veh vehicleChat format ["Repairing and refuelling %1. Stand by...", _vehType];
-
-while {_damage > 0} do
-{
-	sleep 0.5;
-	_percentage = 100 - (_damage * 100);
-	_veh vehicleChat format ["Repairing (%1%)...", floor _percentage];
-	if ((_damage - 0.01) <= 0) then
-	{
-		_veh setDamage 0;
-		_damage = 0;
-	} else {
-		_veh setDamage (_damage - 0.01);
-		_damage = _damage - 0.01;
-	};
+private _vehicle = _vehicles # 0;
+if (_vehicle getVariable ["AB_serviceInProgress", false]) exitWith {
+    _vehicle vehicleChat "Service is already in progress.";
 };
 
-_veh vehicleChat "Repaired (100%).";
+_vehicle setVariable ["AB_serviceInProgress", true, true];
 
-while {_fuelLevel < 1} do
-{
-	sleep 0.5;
-	_percentage = (_fuelLevel * 100);
-	_veh vehicleChat format["Refuelling (%1%)...", floor _percentage];
-	if ((_fuelLevel + 0.01) >= 1) then
-	{
-		_veh setFuel 1;
-		_fuelLevel = 1;
-	} else {
-		_fuelLevel = _fuelLevel + 0.01;
-	};
+private _vehicleClass = typeOf _vehicle;
+private _vehicleConfig = configFile >> "CfgVehicles" >> _vehicleClass;
+private _vehicleName = getText (_vehicleConfig >> "displayName");
+if (_vehicleName isEqualTo "") then { _vehicleName = _vehicleClass; };
+
+private _fuelLevel = fuel _vehicle;
+private _damage = getDamage _vehicle;
+
+private _fnc_reloadMagazines = {
+    params ["_vehicle", "_magazines", "_turretPath"];
+
+    if (_magazines isEqualTo []) exitWith {};
+
+    {
+        _vehicle removeMagazineTurret [_x, _turretPath];
+    } forEach (_vehicle magazinesTurret _turretPath);
+
+    {
+        _vehicle vehicleChat format ["Reloading %1", _x];
+        _vehicle addMagazineTurret [_x, _turretPath];
+        sleep 0.05;
+    } forEach _magazines;
 };
 
-_veh vehicleChat "Refuelled (100%).";
+private _fnc_reloadTurrets = {
+    params ["_vehicle", "_turretsConfig", "_turretPath"];
 
-sleep 2;
+    for "_i" from 0 to ((count _turretsConfig) - 1) do {
+        private _turretConfig = _turretsConfig select _i;
 
-_veh vehicleChat format ["%1 successfully repaired and refuelled.", _vehType];
+        if (isClass _turretConfig) then {
+            private _currentPath = _turretPath + [_i];
+            [_vehicle, getArray (_turretConfig >> "magazines"), _currentPath] call _fnc_reloadMagazines;
+            [_vehicle, _turretConfig >> "Turrets", _currentPath] call _fnc_reloadTurrets;
+        };
+    };
+};
+
+_vehicle setFuel 0;
+_vehicle vehicleChat format ["Servicing %1... Please stand by...", _vehicleName];
+
+[_vehicle, getArray (_vehicleConfig >> "magazines"), [-1]] call _fnc_reloadMagazines;
+[_vehicle, _vehicleConfig >> "Turrets", []] call _fnc_reloadTurrets;
+_vehicle setVehicleAmmo 1;
+
+_vehicle vehicleChat format ["Repairing and refuelling %1. Stand by...", _vehicleName];
+
+while { alive _vehicle && { _damage > 0 } } do {
+    sleep 0.5;
+    _damage = (_damage - 0.01) max 0;
+    _vehicle setDamage _damage;
+    _vehicle vehicleChat format ["Repairing (%1%2)...", floor ((1 - _damage) * 100), "%"];
+};
+
+if (alive _vehicle) then {
+    _vehicle setDamage 0;
+    _vehicle vehicleChat "Repaired (100%).";
+};
+
+while { alive _vehicle && { _fuelLevel < 1 } } do {
+    sleep 0.5;
+    _fuelLevel = (_fuelLevel + 0.01) min 1;
+    _vehicle setFuel _fuelLevel;
+    _vehicle vehicleChat format ["Refuelling (%1%2)...", floor (_fuelLevel * 100), "%"];
+};
+
+if (alive _vehicle) then {
+    _vehicle setFuel 1;
+    _vehicle vehicleChat "Refuelled (100%).";
+    sleep 2;
+    _vehicle vehicleChat format ["%1 successfully rearmed, repaired and refuelled.", _vehicleName];
+};
+
+_vehicle setVariable ["AB_serviceInProgress", false, true];

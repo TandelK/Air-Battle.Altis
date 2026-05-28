@@ -3054,7 +3054,7 @@ class Mission
 			text="Rearm Trigger";
 			name="rearm_blu";
 			expCond="this and ((getPos (thisList select 0)) select 2 < 1);";
-			expActiv="_handle = [(thisList select 0)] execVM ""misc\rearm.sqf"";";
+			expActiv="_handle = [thisList] execVM ""misc\rearm.sqf"";";
 			class Effects
 			{
 			};
@@ -3073,7 +3073,7 @@ class Mission
 			text="Rearm Trigger";
 			name="rearm_blu_1";
 			expCond="this and ((getPos (thisList select 0)) select 2 < 1);";
-			expActiv="_handle = [(thisList select 0)] execVM ""misc\rearm.sqf"";";
+			expActiv="_handle = [thisList] execVM ""misc\rearm.sqf"";";
 			class Effects
 			{
 			};
@@ -3107,7 +3107,7 @@ class Mission
 			text="Rearm Trigger";
 			name="rearm_blu_1_1";
 			expCond="this and ((getPos (thisList select 0)) select 2 < 1);";
-			expActiv="_handle = [(thisList select 0)] execVM ""misc\rearm.sqf"";";
+			expActiv="_handle = [thisList] execVM ""misc\rearm.sqf"";";
 			class Effects
 			{
 			};
@@ -3126,7 +3126,7 @@ class Mission
 			text="Rearm Trigger";
 			name="rearm_blu_2";
 			expCond="this and ((getPos (thisList select 0)) select 2 < 1);";
-			expActiv="_handle = [(thisList select 0)] execVM ""misc\rearm.sqf"";";
+			expActiv="_handle = [thisList] execVM ""misc\rearm.sqf"";";
 			class Effects
 			{
 			};

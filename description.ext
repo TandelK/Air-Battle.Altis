@@ -1,24 +1,22 @@
 class Header
 {
- gameType = CTI;
-  minPlayers = 1;
-  maxPlayers = 50;
+    gameType = CTI;
+    minPlayers = 1;
+    maxPlayers = 50;
 };
 
+onLoadName = "Air Battle - NATO vs IND";
+onLoadMission = "NATO and Independent pilots fight for control of Altis airspace.";
+author = "Air-Battle.Altis maintainers";
+
+// Disable manual and automatic mission saves for multiplayer sessions.
 enableSaving = [false, false];
 
-/* Mission Information */
+// Keep empty playable slots from being filled by AI.
+disabledAI = 1;
 
-/* AI Disable */
-disabledAI=1; /* 0=enable 1=disable */ 
-
-/* Respawn */
-respawn=3;
-respawnDelay=10;
-//respawnTemplates[]= {"Tickets"};
-//Tickets=call BIS_fnc_respawnTickets;
-
-
-
-
- 
+// Respawn at configured base/module positions and show the position menu.
+respawn = 3;
+respawnDelay = 10;
+respawnOnStart = -1;
+respawnTemplates[] = {"MenuPosition"};
